@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-dark-bg text-dark-text font-sans antialiased selection:bg-accent-teal selection:text-dark-bg;
+    background-color: #0B0F19;
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0B0F19;
+}
+::-webkit-scrollbar-thumb {
+  background: #222F4D;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #14B8A6;
+}
+
+/* Chrome, Safari, Edge, Opera number input arrow removal */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox number input arrow removal */
+input[type=number] {
+  -moz-appearance: textfield;
+}
