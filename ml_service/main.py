@@ -297,29 +297,51 @@ def predict_tomorrow(user_id: str):
                     maxAmount=round(max_amount, 2)
                 )
                 
-        # Load model from database
-        model_binary = model_doc["model"]
-        metrics = model_doc["metrics"]
-        model = joblib.load(io.BytesIO(model_binary))
-        
-        # Run prediction
-        pred_val = model.predict(tomorrow_features)[0]
-        # Clip negative predictions to 0.0 since expenses cannot be negative
-        pred_val = max(0.0, float(pred_val))
-        
-        # Calculate range using model MAE
-        mae = metrics.get("mae", 0.0)
-        min_amount = max(0.0, pred_val - mae)
-        max_amount = pred_val + mae
-        
-        return PredictResponse(
-            userId=user_id,
-            prediction=round(pred_val, 2),
-            isFallback=False,
-            metrics=metrics,
-            minAmount=round(min_amount, 2),
-            maxAmount=round(max_amount, 2)
-        )
+        # Load model from database and run prediction
+        try:
+            model_binary = model_doc["model"]
+            metrics = model_doc["metrics"]
+            model = joblib.load(io.BytesIO(model_binary))
+            
+            # Run prediction
+            pred_val = model.predict(tomorrow_features)[0]
+            # Clip negative predictions to 0.0 since expenses cannot be negative
+            pred_val = max(0.0, float(pred_val))
+            
+            # Calculate range using model MAE
+            mae = metrics.get("mae", 0.0)
+            min_amount = max(0.0, pred_val - mae)
+            max_amount = pred_val + mae
+            
+            return PredictResponse(
+                userId=user_id,
+                prediction=round(pred_val, 2),
+                isFallback=False,
+                metrics=metrics,
+                minAmount=round(min_amount, 2),
+                maxAmount=round(max_amount, 2)
+            )
+        except Exception as load_err:
+            # If the stored model fails to de-serialize (e.g. version mismatch / corrupted stream),
+            # clean it up from MongoDB and fall back to SMA calculation
+            print(f"Warning: Failed to load stored model for user {user_id} ({load_err}). Falling back to SMA.")
+            try:
+                models_col.delete_one({"userId": ObjectId(user_id)})
+            except Exception:
+                pass
+                
+            last_days = df_daily['amount'].tail(7)
+            prediction = float(last_days.mean())
+            min_amount = float(last_days.min()) if len(last_days) > 0 else 0.0
+            max_amount = float(last_days.max()) if len(last_days) > 0 else 0.0
+            return PredictResponse(
+                userId=user_id,
+                prediction=round(prediction, 2),
+                isFallback=True,
+                fallbackReason=f"Stored model was incompatible or corrupted. Resetting model and falling back to Simple Moving Average.",
+                minAmount=round(min_amount, 2),
+                maxAmount=round(max_amount, 2)
+            )
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
