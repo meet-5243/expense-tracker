@@ -230,17 +230,17 @@ const Dashboard = () => {
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Overview</h1>
           <p className="text-sm text-dark-muted mt-1">Hello, welcome to your financial summary for {monthName} {currentYear}.</p>
         </div>
-        <div className="flex flex-col items-stretch sm:items-end space-y-2 w-full sm:w-auto relative">
+        <div className="flex flex-col items-stretch sm:items-end space-y-2 w-full sm:w-80 relative">
           <button
             onClick={() => setIsAddOpen(true)}
-            className="flex items-center justify-center space-x-2 px-5 py-3 rounded-2xl bg-accent-teal hover:bg-accent-tealHover text-dark-bg font-semibold text-sm shadow-lg shadow-accent-teal/15 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer w-full sm:w-auto"
+            className="flex items-center justify-center space-x-2 px-5 py-3 rounded-2xl bg-accent-teal hover:bg-accent-tealHover text-dark-bg font-semibold text-sm shadow-lg shadow-accent-teal/15 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer w-full"
           >
             <Plus className="h-4.5 w-4.5" />
             <span>Add Expense</span>
           </button>
           
           {/* Micro-interaction Prediction Widget */}
-          <div className="w-full sm:w-80 z-20">
+          <div className="w-full z-20">
             {!isForecastExpanded ? (
               /* SLEEK ATTRACTIVE LINE */
               <button
