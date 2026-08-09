@@ -7,7 +7,7 @@ import {
   Plus, Edit, Trash2, TrendingUp, AlertTriangle, 
   DollarSign, Calendar, Eye, PieChart, ShoppingBag, 
   Utensils, Car, FileText, Film, HelpCircle,
-  Brain, Sparkles, RefreshCw
+  Brain, Sparkles, RefreshCw, X
 } from 'lucide-react';
 
 // Map categories to icons and colors
@@ -41,6 +41,7 @@ const Dashboard = () => {
   const [predictionData, setPredictionData] = useState(null);
   const [predictionLoading, setPredictionLoading] = useState(true);
   const [retraining, setRetraining] = useState(false);
+  const [isForecastExpanded, setIsForecastExpanded] = useState(false);
 
   // Modal States
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -224,18 +225,122 @@ const Dashboard = () => {
   return (
     <div className="space-y-6 animate-[scaleUp_0.25s_ease-out]">
       {/* Welcome Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-4 sm:space-y-0">
         <div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Overview</h1>
           <p className="text-sm text-dark-muted mt-1">Hello, welcome to your financial summary for {monthName} {currentYear}.</p>
         </div>
-        <button
-          onClick={() => setIsAddOpen(true)}
-          className="flex items-center justify-center space-x-2 px-5 py-3 rounded-2xl bg-accent-teal hover:bg-accent-tealHover text-dark-bg font-semibold text-sm shadow-lg shadow-accent-teal/15 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer"
-        >
-          <Plus className="h-4.5 w-4.5" />
-          <span>Add Expense</span>
-        </button>
+        <div className="flex flex-col items-stretch sm:items-end space-y-2 w-full sm:w-auto relative">
+          <button
+            onClick={() => setIsAddOpen(true)}
+            className="flex items-center justify-center space-x-2 px-5 py-3 rounded-2xl bg-accent-teal hover:bg-accent-tealHover text-dark-bg font-semibold text-sm shadow-lg shadow-accent-teal/15 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer w-full sm:w-auto"
+          >
+            <Plus className="h-4.5 w-4.5" />
+            <span>Add Expense</span>
+          </button>
+          
+          {/* Micro-interaction Prediction Widget */}
+          <div className="w-full sm:w-80 z-20">
+            {!isForecastExpanded ? (
+              /* SLEEK ATTRACTIVE LINE */
+              <button
+                onClick={() => setIsForecastExpanded(true)}
+                className="w-full flex items-center justify-between px-4 py-2.5 rounded-2xl bg-dark-card border border-dark-border/60 hover:border-accent-teal/40 hover:bg-dark-input/60 transition-all duration-200 text-xs shadow-md cursor-pointer hover:scale-[1.01] active:scale-[0.99] group"
+              >
+                <span className="text-dark-muted font-medium flex items-center">
+                  <Brain className="h-4 w-4 text-accent-teal mr-1.5 animate-pulse group-hover:scale-110 transition-transform duration-200" />
+                  Tomorrow's Forecast:
+                </span>
+                {predictionLoading ? (
+                  <span className="h-3.5 w-12 bg-dark-input animate-pulse rounded"></span>
+                ) : predictionData ? (
+                  <span className="text-white font-extrabold flex items-center space-x-1">
+                    <span className="text-accent-teal font-semibold">{formatRupee(predictionData.prediction)}</span>
+                    <Sparkles className="h-3.5 w-3.5 text-accent-teal ml-1 opacity-60 group-hover:opacity-100 transition-opacity" />
+                  </span>
+                ) : (
+                  <span className="text-accent-rose font-semibold">Failed to load</span>
+                )}
+              </button>
+            ) : (
+              /* DETAILED CARD WITH CLOSE BUTTON */
+              <div className="w-full bg-dark-card border border-dark-border/80 rounded-3xl p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between animate-[scaleUp_0.2s_ease-out]">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-dark-muted flex items-center">
+                      <Brain className="h-4 w-4 text-accent-teal mr-1.5" />
+                      Forecast Details
+                    </span>
+                    <div className="flex items-center space-x-1">
+                      {predictionData && !predictionLoading && (
+                        <button
+                          onClick={handleRetrainModel}
+                          disabled={retraining}
+                          className="p-1 rounded-lg border border-dark-border bg-dark-input text-dark-muted hover:text-accent-teal hover:border-accent-teal/20 transition-all duration-150 disabled:opacity-50"
+                          title="Retrain Machine Learning Model"
+                        >
+                          <RefreshCw className={`h-3 w-3 ${retraining ? 'animate-spin' : ''}`} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setIsForecastExpanded(false)}
+                        className="p-1 rounded-lg border border-dark-border bg-dark-input text-dark-muted hover:text-accent-rose hover:border-accent-rose/20 transition-all duration-150"
+                        title="Collapse Details"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {predictionLoading ? (
+                    <div className="mt-3 space-y-2 animate-pulse">
+                      <div className="h-7 w-24 bg-dark-input rounded"></div>
+                      <div className="h-3 w-36 bg-dark-input rounded"></div>
+                    </div>
+                  ) : predictionData ? (
+                    <div className="mt-3">
+                      <div className="flex items-baseline space-x-1.5">
+                        <h2 className="text-2xl font-extrabold text-white">{formatRupee(predictionData.prediction)}</h2>
+                        <span className="text-[10px] text-dark-muted">predicted</span>
+                      </div>
+                      {predictionData.minAmount !== undefined && predictionData.maxAmount !== undefined && !isNaN(predictionData.minAmount) && !isNaN(predictionData.maxAmount) && (
+                        <div className="mt-1 text-[11px] text-dark-muted">
+                          Expected Range: <span className="text-slate-200 font-semibold">{formatRupee(predictionData.minAmount)}</span> – <span className="text-slate-200 font-semibold">{formatRupee(predictionData.maxAmount)}</span>
+                        </div>
+                      )}
+                      <div className="mt-2.5">
+                        {predictionData.isFallback ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-accent-amber/10 text-accent-amber border border-accent-amber/20 uppercase tracking-wide">
+                            7d Moving Avg (Fallback)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20 uppercase tracking-wide">
+                            XGBoost ML Active
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-dark-muted mt-3">Failed to fetch forecast.</div>
+                  )}
+                </div>
+
+                {!predictionLoading && predictionData && (
+                  <div className="pt-2.5 border-t border-dark-border/30 mt-3 text-[9px] text-dark-muted">
+                    {predictionData.isFallback ? (
+                      <span className="block leading-relaxed">{predictionData.fallbackReason}</span>
+                    ) : (
+                      <span className="flex flex-wrap justify-between gap-x-3 gap-y-1">
+                        <span>MAE: <b>{formatRupee(predictionData.metrics?.mae || 0)}</b></span>
+                        <span>RMSE: <b>{formatRupee(predictionData.metrics?.rmse || 0)}</b></span>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Main Stats Panel (Budget & Progress) */}
@@ -281,80 +386,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Column with Prediction & Summary stacked */}
-        <div className="space-y-6 lg:col-span-1 flex flex-col justify-between">
-          {/* Tomorrow's Prediction Card */}
-          <div className="bg-dark-card border border-dark-border/60 rounded-3xl p-6 shadow-xl relative overflow-hidden flex flex-col justify-between flex-1 min-h-[220px]">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-dark-muted flex items-center space-x-1">
-                  <Brain className="h-4 w-4 text-accent-teal mr-1" />
-                  Tomorrow's Forecast
-                </span>
-                {predictionData && !predictionLoading && (
-                  <button
-                    onClick={handleRetrainModel}
-                    disabled={retraining}
-                    className="p-1.5 rounded-lg border border-dark-border bg-dark-input text-dark-muted hover:text-accent-teal hover:border-accent-teal/20 transition-all duration-150 disabled:opacity-50"
-                    title="Retrain Machine Learning Model"
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${retraining ? 'animate-spin' : ''}`} />
-                  </button>
-                )}
-              </div>
-
-              {predictionLoading ? (
-                /* Skeleton loader */
-                <div className="mt-4 space-y-3 animate-pulse">
-                  <div className="h-8 w-32 bg-dark-input rounded"></div>
-                  <div className="h-4 w-40 bg-dark-input rounded"></div>
-                </div>
-              ) : predictionData ? (
-                <div className="mt-4">
-                  <div className="flex items-baseline space-x-2">
-                    <h2 className="text-3xl font-extrabold text-white">{formatRupee(predictionData.prediction)}</h2>
-                    <span className="text-xs text-dark-muted">predicted</span>
-                  </div>
-                  {predictionData.minAmount !== undefined && predictionData.maxAmount !== undefined && !isNaN(predictionData.minAmount) && !isNaN(predictionData.maxAmount) && (
-                    <div className="mt-1 text-xs text-dark-muted">
-                      Expected Range: <span className="text-slate-200 font-semibold">{formatRupee(predictionData.minAmount)}</span> – <span className="text-slate-200 font-semibold">{formatRupee(predictionData.maxAmount)}</span>
-                    </div>
-                  )}
-                  
-                  {/* Status Badge */}
-                  <div className="mt-3">
-                    {predictionData.isFallback ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-accent-amber/10 text-accent-amber border border-accent-amber/20 uppercase tracking-wide">
-                        7d Moving Average (Fallback)
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20 uppercase tracking-wide">
-                        XGBoost ML Model Active
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-sm text-dark-muted mt-4">Failed to fetch forecast.</div>
-              )}
-            </div>
-
-            {!predictionLoading && predictionData && (
-              <div className="pt-3 border-t border-dark-border/30 mt-4 text-[10px] text-dark-muted">
-                {predictionData.isFallback ? (
-                  <span className="block leading-relaxed">{predictionData.fallbackReason}</span>
-                ) : (
-                  <span className="flex flex-wrap justify-between gap-x-4 gap-y-1">
-                    <span>Model Error (MAE): <b>{formatRupee(predictionData.metrics?.mae || 0)}</b></span>
-                    <span>RMSE: <b>{formatRupee(predictionData.metrics?.rmse || 0)}</b></span>
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-
+        {/* Column with Summary stacked */}
+        <div className="lg:col-span-1 flex">
           {/* Highlight Stats: Quick summary card */}
-          <div className="bg-dark-card border border-dark-border/60 rounded-3xl p-6 shadow-xl flex flex-col justify-between flex-1 min-h-[220px]">
+          <div className="bg-dark-card border border-dark-border/60 rounded-3xl p-6 shadow-xl flex flex-col justify-between w-full min-h-[220px]">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-dark-muted">Summary Metrics</span>
               <div className="mt-4 space-y-3">
