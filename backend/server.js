@@ -20,6 +20,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/expenses', require('./routes/expenses'));
 app.use('/api/budgets', require('./routes/budgets'));
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/prediction', require('./routes/prediction'));
 
 // Basic health check route
 app.get('/health', (req, res) => {

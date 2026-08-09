@@ -6,7 +6,8 @@ import ExpenseForm from '../components/ExpenseForm';
 import { 
   Plus, Edit, Trash2, TrendingUp, AlertTriangle, 
   DollarSign, Calendar, Eye, PieChart, ShoppingBag, 
-  Utensils, Car, FileText, Film, HelpCircle 
+  Utensils, Car, FileText, Film, HelpCircle,
+  Brain, Sparkles, RefreshCw
 } from 'lucide-react';
 
 // Map categories to icons and colors
@@ -37,6 +38,9 @@ const Dashboard = () => {
     avgDailySpend: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [predictionData, setPredictionData] = useState(null);
+  const [predictionLoading, setPredictionLoading] = useState(true);
+  const [retraining, setRetraining] = useState(false);
 
   // Modal States
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -60,6 +64,7 @@ const Dashboard = () => {
   // Main loader function
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
+    setPredictionLoading(true);
     try {
       const { startDate, endDate } = getMonthDateRange(currentMonth, currentYear);
       
@@ -77,17 +82,41 @@ const Dashboard = () => {
       // Fetch last 5 expenses
       const expensesRes = await api.get('/expenses?page=1&limit=5');
       setExpenses(expensesRes.data?.expenses || []);
+
+      // Fetch tomorrow's prediction
+      try {
+        const predRes = await api.get('/prediction');
+        setPredictionData(predRes.data);
+      } catch (predErr) {
+        console.error('Failed to retrieve prediction:', predErr);
+      }
     } catch (err) {
       console.error('Error loading dashboard data:', err);
       showToast('Failed to retrieve dashboard stats', 'error');
     } finally {
       setLoading(false);
+      setPredictionLoading(false);
     }
   }, [currentMonth, currentYear, getMonthDateRange, showToast]);
 
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
+
+  const handleRetrainModel = async () => {
+    setRetraining(true);
+    try {
+      await api.post('/prediction/train');
+      showToast('ML Model trained successfully!', 'success');
+      const predRes = await api.get('/prediction');
+      setPredictionData(predRes.data);
+    } catch (err) {
+      console.error(err);
+      showToast(err.response?.data?.detail || 'Failed to retrain ML model', 'error');
+    } finally {
+      setRetraining(false);
+    }
+  };
 
   // Budget management
   const handleBudgetSubmit = async (e) => {
@@ -213,7 +242,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Budget Meter Card */}
-        <div className="lg:col-span-2 bg-dark-card border border-dark-border/60 rounded-3xl p-6 shadow-xl relative overflow-hidden">
+        <div className="lg:col-span-2 bg-dark-card border border-dark-border/60 rounded-3xl p-6 shadow-xl relative overflow-hidden flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-dark-muted">Monthly Budget ({monthName})</span>
@@ -252,27 +281,100 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Highlight Stats: Quick summary card */}
-        <div className="bg-dark-card border border-dark-border/60 rounded-3xl p-6 shadow-xl flex flex-col justify-between">
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-dark-muted">Summary Metrics</span>
-            <div className="mt-4 space-y-4">
-              <div className="flex items-center justify-between py-2 border-b border-dark-border/30">
-                <span className="text-sm text-dark-muted">Daily Avg Spend</span>
-                <span className="text-sm font-bold text-white">{formatRupee(summary.avgDailySpend)}</span>
+        {/* Column with Prediction & Summary stacked */}
+        <div className="space-y-6 lg:col-span-1 flex flex-col justify-between">
+          {/* Tomorrow's Prediction Card */}
+          <div className="bg-dark-card border border-dark-border/60 rounded-3xl p-6 shadow-xl relative overflow-hidden flex flex-col justify-between flex-1 min-h-[220px]">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-dark-muted flex items-center space-x-1">
+                  <Brain className="h-4 w-4 text-accent-teal mr-1" />
+                  Tomorrow's Forecast
+                </span>
+                {predictionData && !predictionLoading && (
+                  <button
+                    onClick={handleRetrainModel}
+                    disabled={retraining}
+                    className="p-1.5 rounded-lg border border-dark-border bg-dark-input text-dark-muted hover:text-accent-teal hover:border-accent-teal/20 transition-all duration-150 disabled:opacity-50"
+                    title="Retrain Machine Learning Model"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${retraining ? 'animate-spin' : ''}`} />
+                  </button>
+                )}
               </div>
-              <div className="flex items-center justify-between py-2 border-b border-dark-border/30">
-                <span className="text-sm text-dark-muted">Highest Expense</span>
-                <span className="text-sm font-bold text-accent-teal">{formatRupee(summary.highestExpense)}</span>
+
+              {predictionLoading ? (
+                /* Skeleton loader */
+                <div className="mt-4 space-y-3 animate-pulse">
+                  <div className="h-8 w-32 bg-dark-input rounded"></div>
+                  <div className="h-4 w-40 bg-dark-input rounded"></div>
+                </div>
+              ) : predictionData ? (
+                <div className="mt-4">
+                  <div className="flex items-baseline space-x-2">
+                    <h2 className="text-3xl font-extrabold text-white">{formatRupee(predictionData.prediction)}</h2>
+                    <span className="text-xs text-dark-muted">predicted</span>
+                  </div>
+                  {predictionData.minAmount !== undefined && predictionData.maxAmount !== undefined && !isNaN(predictionData.minAmount) && !isNaN(predictionData.maxAmount) && (
+                    <div className="mt-1 text-xs text-dark-muted">
+                      Expected Range: <span className="text-slate-200 font-semibold">{formatRupee(predictionData.minAmount)}</span> – <span className="text-slate-200 font-semibold">{formatRupee(predictionData.maxAmount)}</span>
+                    </div>
+                  )}
+                  
+                  {/* Status Badge */}
+                  <div className="mt-3">
+                    {predictionData.isFallback ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-accent-amber/10 text-accent-amber border border-accent-amber/20 uppercase tracking-wide">
+                        7d Moving Average (Fallback)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20 uppercase tracking-wide">
+                        XGBoost ML Model Active
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-dark-muted mt-4">Failed to fetch forecast.</div>
+              )}
+            </div>
+
+            {!predictionLoading && predictionData && (
+              <div className="pt-3 border-t border-dark-border/30 mt-4 text-[10px] text-dark-muted">
+                {predictionData.isFallback ? (
+                  <span className="block leading-relaxed">{predictionData.fallbackReason}</span>
+                ) : (
+                  <span className="flex flex-wrap justify-between gap-x-4 gap-y-1">
+                    <span>Model Error (MAE): <b>{formatRupee(predictionData.metrics?.mae || 0)}</b></span>
+                    <span>RMSE: <b>{formatRupee(predictionData.metrics?.rmse || 0)}</b></span>
+                  </span>
+                )}
               </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-dark-muted">Spent This Month</span>
-                <span className="text-sm font-bold text-white">{formatRupee(summary.totalSpent)}</span>
+            )}
+          </div>
+
+          {/* Highlight Stats: Quick summary card */}
+          <div className="bg-dark-card border border-dark-border/60 rounded-3xl p-6 shadow-xl flex flex-col justify-between flex-1 min-h-[220px]">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-dark-muted">Summary Metrics</span>
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between py-1.5 border-b border-dark-border/30">
+                  <span className="text-sm text-dark-muted">Daily Avg Spend</span>
+                  <span className="text-sm font-bold text-white">{formatRupee(summary.avgDailySpend)}</span>
+                </div>
+                <div className="flex items-center justify-between py-1.5 border-b border-dark-border/30">
+                  <span className="text-sm text-dark-muted">Highest Expense</span>
+                  <span className="text-sm font-bold text-accent-teal">{formatRupee(summary.highestExpense)}</span>
+                </div>
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-sm text-dark-muted">Spent This Month</span>
+                  <span className="text-sm font-bold text-white">{formatRupee(summary.totalSpent)}</span>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="pt-4 border-t border-dark-border/30 mt-4 flex items-center justify-between text-xs text-dark-muted">
-            <span>Range: Current Calendar Month</span>
+            <div className="pt-3 border-t border-dark-border/30 mt-3 flex items-center justify-between text-[10px] text-dark-muted">
+              <span>Range: Current Calendar Month</span>
+            </div>
           </div>
         </div>
       </div>

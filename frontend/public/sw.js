@@ -41,6 +41,9 @@ self.addEventListener('fetch', (event) => {
   // Only handle HTTP/HTTPS (ignore chrome-extension, etc.)
   if (!event.request.url.startsWith(self.location.origin)) return;
 
+  // Do NOT intercept or cache API requests
+  if (event.request.url.includes('/api/')) return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
