@@ -3,6 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const http = require('http');
 const https = require('https');
+const Expense = require('../models/Expense');
 
 // Robust HTTP/HTTPS client to fallback on when native fetch is not available (older Node versions)
 function safeFetch(url, options = {}) {
@@ -43,6 +44,65 @@ function safeFetch(url, options = {}) {
   });
 }
 
+// Calculate SMA fallback directly from MongoDB
+async function calculateSMAPrediction(userId) {
+  try {
+    const expenses = await Expense.find({ userId }).sort({ date: 1 });
+    if (!expenses || expenses.length === 0) {
+      return {
+        userId,
+        prediction: 0.0,
+        isFallback: true,
+        fallbackReason: 'No expense history available. Add some expenses to get started.',
+        minAmount: 0.0,
+        maxAmount: 0.0
+      };
+    }
+
+    // Group by date (YYYY-MM-DD) and sum amounts
+    const dailyMap = {};
+    expenses.forEach(exp => {
+      const dateStr = new Date(exp.date).toISOString().split('T')[0];
+      dailyMap[dateStr] = (dailyMap[dateStr] || 0) + exp.amount;
+    });
+
+    const dailyAmounts = Object.values(dailyMap);
+    const totalDays = dailyAmounts.length;
+
+    // Use a 7-day window
+    const windowSize = Math.min(totalDays, 7);
+    if (windowSize === 0) {
+      return {
+        userId,
+        prediction: 0.0,
+        isFallback: true,
+        fallbackReason: 'No daily expense history available.',
+        minAmount: 0.0,
+        maxAmount: 0.0
+      };
+    }
+
+    const lastDays = dailyAmounts.slice(-windowSize);
+    const sum = lastDays.reduce((a, b) => a + b, 0);
+    const prediction = sum / windowSize;
+    const minAmount = Math.min(...lastDays);
+    const maxAmount = Math.max(...lastDays);
+
+    return {
+      userId,
+      prediction: Math.round(prediction * 100) / 100,
+      isFallback: true,
+      fallbackReason: 'ML service is warming up. Displaying Simple Moving Average fallback prediction.',
+      metrics: null,
+      minAmount: Math.round(minAmount * 100) / 100,
+      maxAmount: Math.round(maxAmount * 100) / 100
+    };
+  } catch (err) {
+    console.error('Failed to calculate SMA fallback in backend:', err);
+    return null;
+  }
+}
+
 // Get tomorrow's predicted expense
 // GET /api/prediction
 router.get('/', auth, async (req, res) => {
@@ -61,8 +121,13 @@ router.get('/', auth, async (req, res) => {
     const data = await response.json();
     res.json(data);
   } catch (error) {
+    console.warn(`Warning: Failed to reach ML service (${error.message}). Calculating local SMA fallback...`);
+    const fallbackData = await calculateSMAPrediction(req.userId);
+    if (fallbackData) {
+      return res.json(fallbackData);
+    }
     res.status(500).json({
-      message: 'Failed to communicate with prediction service',
+      message: 'Failed to communicate with prediction service and SMA fallback failed',
       error: error.message
     });
   }
